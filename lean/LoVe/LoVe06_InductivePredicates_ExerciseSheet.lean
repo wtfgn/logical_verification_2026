@@ -34,20 +34,38 @@ Hint: `cases` or `induction` is useful to reason about hypotheses of the form
 `Even …`. -/
 
 @[simp] theorem Odd_1 :
-    Odd 1 :=
-  sorry
+    Odd 1 := by
+  intro h
+  cases h
 
 /- 1.2. Prove that 3 and 5 are odd. -/
 
 -- enter your answer here
+theorem Odd_3 :
+    Odd 3 := by
+  intro h
+  cases h with
+  | add_two _ h_even =>
+      cases h_even
+
+theorem Odd_5:
+    Odd 5 := by
+  intro h
+  cases h with
+  | add_two _ h_even =>
+      cases h_even with
+      | add_two _ h_even' =>
+          cases h_even'
 
 /- 1.3. Complete the following proof by structural induction. -/
 
 theorem Even_two_times :
     ∀m : ℕ, Even (2 * m)
   | 0     => Even.zero
-  | m + 1 =>
-    sorry
+  | m + 1 => by
+      apply Even.add_two
+      simp
+      apply Even_two_times
 
 
 /- ## Question 2: Tennis Games
@@ -99,24 +117,49 @@ theorems (e.g., `IsFull_mirror`, `mirror_mirror`). -/
 #check mirror_mirror
 
 theorem mirror_IsFull {α : Type} :
-    ∀t : Tree α, IsFull (mirror t) → IsFull t :=
-  sorry
+    ∀t : BinaryTree α, IsFull (mirror t) → IsFull t := by
+  intro t h
+  induction t with
+  | nil => exact IsFull.nil
+  | node =>
+    have fmt := IsFull_mirror _ h
+    simpa [mirror_mirror] using fmt
+      
 
 /- 3.2. Define a `map` function on binary trees, similar to `List.map`. -/
 
-def Tree.map {α β : Type} (f : α → β) : Tree α → Tree β :=
-  sorry
+def Tree.map {α β : Type} (f : α → β) : BinaryTree α → BinaryTree β 
+  | .nil => .nil
+  | .node x l r => .node (f x) (Tree.map f l) (Tree.map f r)
 
 /- 3.3. Prove the following theorem by case distinction. -/
 
 theorem Tree.map_eq_empty_iff {α β : Type} (f : α → β) :
-    ∀t : Tree α, Tree.map f t = Tree.nil ↔ t = Tree.nil :=
-  sorry
+    ∀t : BinaryTree α, Tree.map f t = BinaryTree.nil ↔ t = BinaryTree.nil := by
+  intro t
+  cases t <;> simp [Tree.map]
 
 /- 3.4 (**optional**). Prove the following theorem by rule induction. -/
 
 theorem map_mirror {α β : Type} (f : α → β) :
-    ∀t : Tree α, IsFull t → IsFull (Tree.map f t) :=
-  sorry
-
+    ∀t : BinaryTree α, IsFull t → IsFull (Tree.map f t) := by
+  intro t hFull
+  induction hFull with 
+  | nil =>
+      simp [Tree.map]
+      exact IsFull.nil
+  | node x l r hl hr hiff hl_ih hr_ih =>
+      simp [Tree.map]
+      apply IsFull.node
+      assumption'
+      exact
+        ⟨ by
+            intro h_map_left_nil
+            simp [Tree.map_eq_empty_iff] at *
+            exact hiff.mp h_map_left_nil
+        , by
+            intro h_map_right_nil
+            simp [Tree.map_eq_empty_iff] at *
+            exact hiff.mpr h_map_right_nil
+        ⟩
 end LoVe

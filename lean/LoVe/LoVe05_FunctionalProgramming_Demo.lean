@@ -438,11 +438,11 @@ Recursive definitions (and proofs by induction) work roughly as for lists, but
 we may need to recurse (or invoke the induction hypothesis) on several child
 nodes. -/
 
-def mirror {α : Type} : Tree α → Tree α
-  | Tree.nil        => Tree.nil
-  | Tree.node a l r => Tree.node a (mirror r) (mirror l)
+def mirror {α : Type} : BinaryTree α → BinaryTree α
+  | BinaryTree.nil        => BinaryTree.nil
+  | BinaryTree.node a l r => BinaryTree.node a (mirror r) (mirror l)
 
-theorem mirror_mirror {α : Type} (t : Tree α) :
+theorem mirror_mirror {α : Type} (t : BinaryTree α) :
     mirror (mirror t) = t :=
   by
     induction t with
@@ -450,25 +450,25 @@ theorem mirror_mirror {α : Type} (t : Tree α) :
     | node a l r ih_l ih_r => simp [mirror, ih_l, ih_r]
 
 theorem mirror_mirror_calc {α : Type} :
-    ∀t : Tree α, mirror (mirror t) = t
-  | Tree.nil        => by rfl
-  | Tree.node a l r =>
+    ∀t : BinaryTree α, mirror (mirror t) = t
+  | BinaryTree.nil        => by rfl
+  | BinaryTree.node a l r =>
     calc
-      mirror (mirror (Tree.node a l r))
-      = mirror (Tree.node a (mirror r) (mirror l)) :=
+      mirror (mirror (BinaryTree.node a l r))
+      = mirror (BinaryTree.node a (mirror r) (mirror l)) :=
         by rfl
-      _ = Tree.node a (mirror (mirror l))
+      _ = BinaryTree.node a (mirror (mirror l))
         (mirror (mirror r)) :=
         by rfl
-      _ = Tree.node a l (mirror (mirror r)) :=
+      _ = BinaryTree.node a l (mirror (mirror r)) :=
         by rw [mirror_mirror_calc l]
-      _ = Tree.node a l r :=
+      _ = BinaryTree.node a l r :=
         by rw [mirror_mirror_calc r]
 
 theorem mirror_Eq_nil_Iff {α : Type} :
-    ∀t : Tree α, mirror t = Tree.nil ↔ t = Tree.nil
-  | Tree.nil        => by simp [mirror]
-  | Tree.node _ _ _ => by simp [mirror]
+    ∀t : BinaryTree α, mirror t = BinaryTree.nil ↔ t = BinaryTree.nil
+  | BinaryTree.nil        => by simp [mirror]
+  | BinaryTree.node _ _ _ => by simp [mirror]
 
 
 /- ## Dependent Inductive Types (**optional**) -/

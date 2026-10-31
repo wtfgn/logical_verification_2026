@@ -40,6 +40,24 @@ the given environment: -/
 
 inductive BigStep : AExp × Envir → ℤ → Prop where
   | num (i env) : BigStep (AExp.num i, env) i
+  | var (s env) : BigStep (AExp.var s, env) (env s)
+  | add (a₁ a₂ env i₁ i₂)
+      (h₁ : BigStep (a₁, env) i₁)
+      (h₂ : BigStep (a₂, env) i₂) :
+    BigStep (AExp.add a₁ a₂, env) (i₁ + i₂)
+  | sub (a₁ a₂ env i₁ i₂)
+      (h₁ : BigStep (a₁, env) i₁)
+      (h₂ : BigStep (a₂, env) i₂) :
+    BigStep (AExp.sub a₁ a₂, env) (i₁ - i₂)
+  | mul (a₁ a₂ env i₁ i₂)
+      (h₁ : BigStep (a₁, env) i₁)
+      (h₂ : BigStep (a₂, env) i₂) :
+    BigStep (AExp.mul a₁ a₂, env) (i₁ * i₂)
+  | div (a₁ a₂ env i₁ i₂)
+      (h₁ : BigStep (a₁, env) i₁)
+      (h₂ : BigStep (a₂, env) i₂)
+      (h : i₂ ≠ 0) :
+    BigStep (AExp.div a₁ a₂, env) (i₁ / i₂)
 
 infix:60 " ⟹ " => BigStep
 
@@ -49,15 +67,32 @@ Hint: It may help to first prove
 `(AExp.add (AExp.num 2) (AExp.num 2), env) ⟹ 2 + 2`. -/
 
 theorem BigStep_add_two_two (env : Envir) :
-    (AExp.add (AExp.num 2) (AExp.num 2), env) ⟹ 4 :=
-  sorry
+    (AExp.add (AExp.num 2) (AExp.num 2), env) ⟹ 4 := by
+  apply BigStep.add (AExp.num 2) (AExp.num 2) env 2 2 <;>
+  apply BigStep.num 2 env
+
+
+
 
 /- 1.3. Prove that the big-step semantics is sound with respect to the `eval`
 function: -/
 
 theorem BigStep_sound (aenv : AExp × Envir) (i : ℤ) (hstep : aenv ⟹ i) :
-    eval (Prod.snd aenv) (Prod.fst aenv) = i :=
-  sorry
+    eval (Prod.snd aenv) (Prod.fst aenv) = i := by
+  induction hstep with
+  | num i env =>
+      simp [eval]
+  | var s env =>
+      simp [eval]
+  | add a₁ a₂ env i₁ i₂ h₁ h₂ h₁_ih h₂_ih =>
+      simp [eval, h₁_ih, h₂_ih]
+  | sub a₁ a₂ env i₁ i₂ h₁ h₂ h₁_ih h₂_ih =>
+      simp [eval, h₁_ih, h₂_ih]
+  | mul a₁ a₂ env i₁ i₂ h₁ h₂ h₁_ih h₂_ih =>
+      simp [eval, h₁_ih, h₂_ih]
+  | div a₁ a₂ env i₁ i₂ h₁ h₂ h h₁_ih h₂_ih =>
+      simp [eval, h₁_ih, h₂_ih]
+
 
 end AExp
 
@@ -96,6 +131,25 @@ concerned), and `repeat 0 S` has the same effect as `skip`.
 inductive BigStep : Stmt × State → State → Prop where
   | skip (s) :
     BigStep (Stmt.skip, s) s
+  | assign (x a s):
+    BigStep (Stmt.assign x a, s) (s[x ↦ a s])
+  | seq (S s T t u)
+      (hs : BigStep (S, s) t)
+      (ht : BigStep (T, t) u) :
+    BigStep (S; T, s) u
+  | unlessDo_true (B S s)
+      (hcond : B s) :
+    BigStep (Stmt.unlessDo B S, s) s
+  | unlessDo_false (B S s t)
+      (hcond : ¬ B s)
+      (hbody : BigStep (S, s) t) :
+    BigStep (Stmt.unlessDo B S, s) t
+  | repeat_zero (S s) :
+    BigStep (Stmt.repeat 0 S, s) s
+  | repeat_succ (n S s t u)
+      (hbody : BigStep (S, s) t)
+      (hloop : BigStep (Stmt.repeat n S, t) u) :
+    BigStep (Stmt.repeat (n + 1) S, s) u
 -- enter the missing cases here
 
 infix:110 " ⟹ " => BigStep
@@ -105,6 +159,19 @@ infix:110 " ⟹ " => BigStep
 inductive SmallStep : Stmt × State → Stmt × State → Prop where
   | assign (x a s) :
     SmallStep (Stmt.assign x a, s) (Stmt.skip, s[x ↦ a s])
+  | seq_step (S S' T s s') (hS : SmallStep (S, s) (S', s')) :
+    SmallStep (S; T, s) (S'; T, s')
+  | seq_skip (T s) :
+    SmallStep (Stmt.skip; T, s) (T, s)
+  | unlessDo_true (B S s) (hcond : B s) :
+    SmallStep (Stmt.unlessDo B S, s) (Stmt.skip, s)
+  | unlessDo_false (B S s) (hcond : ¬ B s) :
+    SmallStep (Stmt.unlessDo B S, s) (S, s)
+  | repeat_zero (S s):
+    SmallStep (Stmt.repeat 0 S, s) (Stmt.skip, s)
+  | repeat_succ (n S s) :
+    SmallStep (Stmt.repeat (n + 1) S, s) (S; Stmt.repeat n S, s)
+
 -- enter the missing cases here
 
 infixr:100 " ⇒ " => SmallStep
@@ -122,7 +189,38 @@ decreases with each small-step transition. -/
 
 def mess : Stmt → ℕ
   | Stmt.skip         => 0
+  | Stmt.assign _ _     => 1
+  | Stmt.seq S T       => mess S + mess T + 1
+  | Stmt.unlessDo _ S => mess S + 1
+  | Stmt.repeat n S     => n * (mess S + 2) + 1
 -- enter the missing cases here
+/-
+For the `repeat` case, here is the derivation
+For the base case (repeat_zero):
+  repeat 0 S ⟹ skip
+  By the definition of mess, the measure should be strictly decreasing with
+  each small-step transition. Therefore, we have:
+    mess(repeat 0 S) > mess(skip)
+    mess(repeat 0 S) > 0
+  i.e. the value must ≥ 1. The simplest choice that works uniformly is
+    mess(repeat 0 S) = 1 
+
+For the step case (repeat_succ):
+  repeat (n + 1) S ⟹ S; repeat n S
+  Again, by the definition of mess, we have:
+    mess(repeat (n + 1) S) > mess(S; repeat n S)
+    mess(repeat (n + 1) S) > mess(S) + mess(repeat n S) + 1 (given by seq)
+  The required relation becomes:
+    mess(repeat (n + 1) S) ≥ mess(S) + mess(repeat n S) + 1 + 1 
+  The simplest choice that works uniformly is
+    mess(repeat (n + 1) S) = mess(S) + mess(repeat n S) + 2
+
+  By solving the recurrence relation:
+    mess(repeat 0 S) = 1
+    mess(repeat (n + 1) S) = mess(S) + mess(repeat n S) + 2
+  we have:
+    mess(repeat n S) = n * (mess(S) + 2) + 1
+-/
 
 /- You can validate your answer as follows. Consider the following program
 `S₀`: -/
@@ -166,15 +264,47 @@ def S₆ : Stmt :=
 necessary, revise your answer to question 2.3. -/
 
 theorem SmallStep_mess_decreases {Ss Tt : Stmt × State} (h : Ss ⇒ Tt) :
-    mess (Prod.fst Ss) > mess (Prod.fst Tt) :=
-  sorry
+    mess (Prod.fst Ss) > mess (Prod.fst Tt) := by
+  cases h <;> simp [mess]
+  case seq_step S S' T s s' hS =>
+    simp [SmallStep_mess_decreases hS]
+  case repeat_succ n S s => 
+    linarith
+
+
 
 /- 2.5. Prove the following inversion rule for the big-step semantics of
 `unless`. -/
 
 theorem BigStep_ite_iff {B S s t} :
-    (Stmt.unlessDo B S, s) ⟹ t ↔ (B s ∧ s = t) ∨ (¬ B s ∧ (S, s) ⟹ t) :=
-  sorry
+    (Stmt.unlessDo B S, s) ⟹ t ↔ (B s ∧ s = t) ∨ (¬ B s ∧ (S, s) ⟹ t) := by
+  apply Iff.intro
+  . intro h
+    cases h with
+    | unlessDo_true B S s hcond =>
+        left
+        apply And.intro
+        . exact hcond
+        . rfl
+    | unlessDo_false B S s t hcond hbody =>
+        right
+        apply And.intro
+        . exact hcond
+        . exact hbody
+  . intro h
+    cases h with
+    | inr h' =>
+        apply BigStep.unlessDo_false
+        . exact h'.left
+        . exact h'.right
+    | inl h' => 
+        have hcond : B s := h'.left
+        have hst : s = t := h'.right
+        subst hst
+        apply BigStep.unlessDo_true
+        exact hcond
+
+
 
 /- 2.6. Prove the following inversion rule for the big-step semantics of
 `repeat`. -/
@@ -182,8 +312,41 @@ theorem BigStep_ite_iff {B S s t} :
 theorem BigStep_repeat_iff {n S s u} :
     (Stmt.repeat n S, s) ⟹ u ↔
     (n = 0 ∧ u = s)
-    ∨ (∃m t, n = m + 1 ∧ (S, s) ⟹ t ∧ (Stmt.repeat m S, t) ⟹ u) :=
-  sorry
+    ∨ (∃m t, n = m + 1 ∧ (S, s) ⟹ t ∧ (Stmt.repeat m S, t) ⟹ u) := by
+  apply Iff.intro
+  . intro h
+    cases h with
+    | repeat_zero S s =>
+        left
+        trivial
+    | repeat_succ n S s t u hobdy hloop =>
+        right
+        apply Exists.intro n
+        apply Exists.intro t
+        apply And.intro
+        . rfl
+        apply And.intro
+        . exact hobdy
+        . exact hloop
+  . intro h
+    cases h with
+    | inr h =>
+        have ⟨n', t, hn, hbody, hloop⟩ := h
+        induction n with
+        | zero =>
+            contradiction
+        | succ n ih =>
+            apply BigStep.repeat_succ n S s t u
+            assumption'
+            have h' : n = n' := by
+              linarith
+            subst h'
+            exact hloop
+    | inl h =>
+        have hzero : n = 0 := h.left
+        have hst : u = s := h.right
+        simp [hzero, hst]
+        apply BigStep.repeat_zero
 
 end REPEAT
 
@@ -254,36 +417,109 @@ inductive Matches {α : Type} : Regex α → List α → Prop where
 3.1. Explain why there is no rule for `nothing`. -/
 
 -- enter your answer here
+/-
+Because that regular expression is defined to match no string at all.
+The predicate `Matches` is the smallest relation closed under the given constructors.
+If we add a rule such as
+`| nothing (s : List α) : Matches Regex.nothing s`
+then `nothing` would match every (or some) string, whcihc contradicts its intended meaning.
+By simply omitting any constructor that mentions `Regex.nothing`, the inductive defintion
+guarantees:
+`∀ s, ¬ Matches Regex.nothing s`
+-/
 
 /- 3.2. Prove the following inversion rules. -/
 
 @[simp] theorem Matches_atom {α : Type} {s : List α} {a : α} :
-    Matches (Regex.atom a) s ↔ s = [a] :=
-  sorry
+    Matches (Regex.atom a) s ↔ s = [a] := by
+  apply Iff.intro
+  . intro h
+    cases h
+    rfl
+  . intro h
+    subst h
+    apply Matches.atom
+    
+     
 
 @[simp] theorem Matches_nothing {α : Type} {s : List α} :
-    ¬ Matches Regex.nothing s :=
-  sorry
+    ¬ Matches Regex.nothing s := by
+  intro h
+  cases h
 
 @[simp] theorem Matches_empty {α : Type} {s : List α} :
-    Matches Regex.empty s ↔ s = [] :=
-  sorry
+    Matches Regex.empty s ↔ s = [] := by
+  apply Iff.intro
+  . intro h
+    cases h
+    rfl
+  . intro h
+    subst h
+    apply Matches.empty
 
 @[simp] theorem Matches_concat {α : Type} {s : List α} {r₁ r₂ : Regex α} :
     Matches (Regex.concat r₁ r₂) s
-    ↔ (∃s₁ s₂, Matches r₁ s₁ ∧ Matches r₂ s₂ ∧ s = s₁ ++ s₂) :=
-  sorry
+    ↔ (∃s₁ s₂, Matches r₁ s₁ ∧ Matches r₂ s₂ ∧ s = s₁ ++ s₂) := by
+  apply Iff.intro
+  . intro h
+    cases h with
+    | concat r₁ r₂ s₁ s₂ h₁ h₂ =>
+        apply Exists.intro s₁
+        apply Exists.intro s₂
+        trivial
+  . intro h
+    obtain ⟨s₁, s₂, h₁, h₂, hst⟩ := h
+    subst hst
+    apply Matches.concat
+    assumption'
 
 @[simp] theorem Matches_alt {α : Type} {s : List α} {r₁ r₂ : Regex α} :
-    Matches (Regex.alt r₁ r₂) s ↔ (Matches r₁ s ∨ Matches r₂ s) :=
-  sorry
+    Matches (Regex.alt r₁ r₂) s ↔ (Matches r₁ s ∨ Matches r₂ s) := by
+  apply Iff.intro
+  . intro h
+    cases h with
+    | alt_left r₁ r₂ s h =>
+        left
+        exact h
+    | alt_right r₁ r₂ s h =>
+        right
+        exact h
+  . intro h
+    cases h with
+    | inl h =>
+        apply Matches.alt_left
+        exact h
+    | inr h =>
+        apply Matches.alt_right
+        exact h
+
 
 /- 3.3. Prove the following inversion rule. -/
 
 theorem Matches_star {α : Type} {s : List α} {r : Regex α} :
     Matches (Regex.star r) s ↔
     s = []
-    ∨ (∃s₁ s₂, Matches r s₁ ∧ Matches (Regex.star r) s₂ ∧ s = s₁ ++ s₂) :=
-  sorry
+    ∨ (∃s₁ s₂, Matches r s₁ ∧ Matches (Regex.star r) s₂ ∧ s = s₁ ++ s₂) := by
+  apply Iff.intro
+  . intro h
+    cases h with
+    | star_base r =>
+        left
+        rfl
+    | star_step r s₁ s₂ h₁ h₂ =>
+        right
+        apply Exists.intro s₁
+        apply Exists.intro s₂
+        trivial
+  . intro h
+    cases h with
+    | inr h =>
+        obtain ⟨s₁, s₂, h₁, h₂, hst⟩ := h
+        subst hst
+        apply Matches.star_step
+        assumption'
+    | inl h =>
+        subst h
+        apply Matches.star_base
 
 end LoVe

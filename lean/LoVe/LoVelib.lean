@@ -142,6 +142,7 @@ theorem Nat.two_mul (n : ℕ) :
     A ⊆ B ↔ ∀a, a ∈ A → a ∈ B :=
   by rfl
 
+@[instance_reducible]
 def Set.PartialOrder {α : Type} : PartialOrder (Set α) :=
   inferInstance
 
@@ -305,14 +306,14 @@ notation s "[" name " ↦ " val "]" =>
 @[simp] theorem update_apply (name : String) (val : ℕ) (s : State) :
     (s[name ↦ val]) name = val :=
   by
-    apply if_pos
+    apply ite_eq_left
     rfl
 
 @[simp] theorem update_apply_neq (name name' : String) (val : ℕ) (s : State)
       (hneq : name' ≠ name) :
     (s[name ↦ val]) name' = s name' :=
   by
-    apply if_neg
+    apply ite_eq_right
     assumption
 
 @[simp] theorem update_override (name : String) (val₁ val₂ : ℕ) (s : State) :

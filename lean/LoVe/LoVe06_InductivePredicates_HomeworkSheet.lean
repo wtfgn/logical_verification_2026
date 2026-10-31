@@ -30,32 +30,41 @@ inductive Term : Type where
 argument is of the form `Term.lam …` and that returns `False` otherwise. -/
 
 -- enter your definition here
+inductive IsLam : Term → Prop where
+  | lam : ∀ (x : String) (t : Term), IsLam (Term.lam x t)
 
 /- 1.2. Validate your answer to question 1.1 by proving the following
 theorems: -/
 
 theorem IsLam_lam (s : String) (t : Term) :
     IsLam (Term.lam s t) :=
-  sorry
+  IsLam.lam s t
 
 theorem not_IsLamVar (s : String) :
-    ¬ IsLam (Term.var s) :=
-  sorry
+    ¬ IsLam (Term.var s) := by
+  intro h
+  contradiction
 
 theorem not_IsLam_app (t u : Term) :
-    ¬ IsLam (Term.app t u) :=
-  sorry
+    ¬ IsLam (Term.app t u) := by
+  intro h
+  cases h
+  
 
 /- 1.3. Define an inductive predicate `IsApp` that returns `True` if its
 argument is of the form `Term.app …` and that returns `False` otherwise. -/
 
 -- enter your definition here
+inductive IsApp : Term → Prop where
+  | app : ∀ (t₁ : Term) (t₂ : Term), IsApp (Term.app t₁ t₂)
 
 /- 1.4. Define an inductive predicate `IsLamFree` that is true if and only if
 its argument is a term that contains no λ-expressions. -/
 
 -- enter your definition here
-
+inductive IsLamFree : Term → Prop
+  | var (s : String) : IsLamFree (Term.var s)
+  | app (t₁ t₂ : Term) : IsLamFree t₁ → IsLamFree t₂ → IsLamFree (Term.app t₁ t₂)
 
 /- ## Question 2: Transitive Closure
 
@@ -81,6 +90,9 @@ replace `(step)` with the following right-leaning rule:
 Define a predicate `TCV2` that embodies this alternative definition. -/
 
 -- enter your definition here
+inductive TCV2 {α :Type} (R : α → α → Prop) : α → α → Prop where
+  | base (a b : α) : R a b → TCV2 R a b
+  | step (a b c : α) : TCV2 R a b → R b c → TCV2 R a c
 
 /- 2.2. Yet another definition of the transitive closure `R⁺` would use the
 following symmetric rule instead of `(step)` or `(pets)`:
@@ -89,21 +101,30 @@ following symmetric rule instead of `(step)` or `(pets)`:
 
 Define a predicate `TCV3` that embodies this alternative definition. -/
 
--- enter your definition here
+inductive TCV3 {α : Type} (R : α → α → Prop) : α → α → Prop where
+  | base (a b : α) : R a b → TCV3 R a b
+  | step (a b c : α) : TCV3 R a b → TCV3 R b c → TCV3 R a c
 
 /- 2.3. Prove that `(step)` also holds as a theorem about `TCV3`. -/
 
 theorem TCV3_step {α : Type} (R : α → α → Prop) (a b c : α) (rab : R a b)
       (tbc : TCV3 R b c) :
-    TCV3 R a c :=
-  sorry
+    TCV3 R a c := by
+  apply TCV3.step a b c
+  constructor
+  assumption'
 
 /- 2.4. Prove the following theorem by rule induction: -/
 
 theorem TCV1_pets {α : Type} (R : α → α → Prop) (c : α) :
-    ∀a b, TCV1 R a b → R b c → TCV1 R a c :=
-  sorry
-
+    ∀a b, TCV1 R a b → R b c → TCV1 R a c := by
+  intro a b h h2
+  induction h with
+  | base a b hab => 
+      exact TCV1.step a b c hab (TCV1.base b c h2)
+  | step a b d hab hbd ih =>
+     apply TCV1.step a b c hab
+     exact ih h2
 
 /- ## Question 3: Even and Odd
 
@@ -118,30 +139,51 @@ definition below. The definition should distinguish two cases, like `Even`, and
 should not rely on `Even`. -/
 
 inductive Odd : ℕ → Prop where
--- supply the missing cases here
+  | one : Odd 1
+  | add_two (k : ℕ) : Odd k → Odd (k + 2)
 
 /- 3.2. Give proof terms for the following propositions, based on your answer
 to question 2.1. -/
 
 theorem Odd_3 :
-    Odd 3 :=
-  sorry
+    Odd 3 := by
+  apply Odd.add_two 1
+  exact Odd.one
+  
 
 theorem Odd_5 :
-    Odd 5 :=
-  sorry
+    Odd 5 := by
+  apply Odd.add_two 3
+  exact Odd_3
 
 /- 3.3. Prove the following theorem by rule induction: -/
 
 theorem Even_Odd {n : ℕ} (heven : Even n) :
-    Odd (n + 1) :=
-  sorry
+    Odd (n + 1) := by
+  induction heven with
+  | zero =>
+      simp
+      exact Odd.one
+  | add_two a a_ih a_ih'  =>
+      apply Odd.add_two (a + 1) a_ih'
 
-/- 3.4. Prove the same theorem again, this time as a "paper" proof. This is a
+/- 3.4. prove the same theorem again, this time as a "paper" proof. this is a
 good exercise to develop a deeper understanding of how rule induction works.
-Follow the guidelines given in question 1.4 of exercise 5. -/
+follow the guidelines given in question 1.4 of exercise 5. -/
 
 -- enter your paper proof here
+
+/-
+Proof: ∀ n ∈ ℕ, Even n → Odd (n + 1)
+We perform rule induction of the hypothesis h : Even n.
+
+Base case (Even.zero): n = 0:
+  Then n + 1 = 1, and Odd 1 holds by the constructor Odd.one.
+Inductive step (Even.add_two): n = k + 2 for some k ∈ ℕ
+  Our goal is to show: Even (k + 2) → Odd ((k + 2) + 1) = Odd (k + 3).
+  Notice that (k + 3) = (k + 1) + 2. By the inductive hypothesis, Odd (k + 1).
+  Thus, we can apply the constructor Odd.add_two to Odd (k + 1) to obtain Odd (k + 3).
+-/
 
 /- 3.5. Prove the following theorem using rule induction.
 

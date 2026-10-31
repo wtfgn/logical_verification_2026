@@ -34,16 +34,21 @@ numeric weight, a left subtree, and a right subtree.
 tree over some type variable `α` and that returns the weight component of the
 root node of the tree: -/
 
-def weight {α : Type} : HTree α → ℕ :=
-  sorry
+def weight {α : Type} : HTree α → ℕ
+  | .leaf w _ => w
+  | .inner w l r => w
 
 /- 1.2. Define a polymorphic Lean function called `unite` that takes
 two trees `l, r : HTree α` and that returns a new tree such that (1) its left
 child is `l`; (2) its right child is `r`; and (3) its weight is the sum of the
 weights of `l` and `r`. -/
 
-def unite {α : Type} : HTree α → HTree α → HTree α :=
-  sorry
+def unite {α : Type} : HTree α → HTree α → HTree α 
+  | l@(.leaf w₁ x₁), r@(.leaf w₂ x₂) => .inner (w₁ + w₂) l r
+  | l@(.leaf w₁ x₁), r@(.inner w₂ l₂ r₂) => .inner (w₁ + w₂) l r
+  | l@(.inner w₁ l₁ r₁), r@(.leaf w₂ x₂) => .inner (w₁ + w₂) l r
+  | l@(.inner w₁ l₁ r₁), r@(.inner w₂ l₂ r₂) => .inner (w₁ + w₂) l r
+
 
 /- 1.3. Consider the following `insort` function, which inserts a
 tree `u` in a list of trees that is sorted by increasing weight and which
@@ -57,8 +62,22 @@ def insort {α : Type} (u : HTree α) : List (HTree α) → List (HTree α)
 /- Prove that `insort`ing a tree into a list cannot yield the empty list: -/
 
 theorem insort_Neq_nil {α : Type} (t : HTree α) :
-    ∀ts : List (HTree α), insort t ts ≠ [] :=
-  sorry
+    ∀ts : List (HTree α), insort t ts ≠ []
+  | [] => by simp [insort]
+  | x :: xs => by
+    simp [insort]
+    split_ifs <;> simp -- easier to read
+
+    -- For structured proof:
+    -- if h : weight t ≤ weight x then
+    --   simp [h]
+    -- else
+    --   simp [h]
+
+    -- For tactical proof:
+    -- cases Classical.em (weight t ≤ weight x) with
+    -- | inl h => simp [h]
+    -- | inr h => simp [h]
 
 /- 1.4. Prove the same property as above again, this time as a
 "paper" proof. Follow the guidelines given in question 1.4 of the exercise. -/
@@ -83,7 +102,15 @@ theorem reverse_append_calc {α : Type} :
     ∀xs ys : List α, reverse (xs ++ ys) = reverse ys ++ reverse xs
   | [],      ys => by simp [reverse]
   | x :: xs, ys =>
-    sorry
+      calc
+        reverse ((x :: xs) ++ ys) = reverse (x :: (xs ++ ys)) := by
+          simp
+        _ = reverse (xs ++ ys) ++ [x] := by
+          simp [reverse]
+        _ = reverse ys ++ reverse xs ++ [x] := by
+          simp [reverse_append_calc]
+        _ = reverse ys ++ (reverse xs ++ [x]) := by
+          simp
 
 /- 2.2. Prove the induction step in the proof below using the calculational
 style, following this proof sketch:
@@ -104,7 +131,13 @@ theorem reverse_reverse_calc {α : Type} :
     ∀xs : List α, reverse (reverse xs) = xs
   | []      => by rfl
   | x :: xs =>
-    sorry
+      calc
+        reverse (reverse (x :: xs)) = reverse (reverse xs ++ [x]) := by
+          simp [reverse]
+        _ = reverse [x] ++ reverse (reverse xs) := by
+          simp [reverse_append]
+        _ = reverse [x] ++ xs := by
+          simp [reverse_reverse_calc]
 
 
 /- ## Question 3: Gauss's Summation Formula
@@ -130,15 +163,21 @@ Hints:
 #check add_mul
 
 theorem sumUpToOfFun_eq :
-    ∀m : ℕ, 2 * sumUpToOfFun (fun i ↦ i) m = m * (m + 1) :=
-  sorry
+    ∀m : ℕ, 2 * sumUpToOfFun (fun i ↦ i) m = m * (m + 1)
+  | 0 => by rfl
+  | m + 1 => by
+    simp +arith [sumUpToOfFun]
+    simp [sumUpToOfFun_eq]
+    simp +arith [mul_add, add_mul]
 
 /- 3.2. Prove the following property of `sumUpToOfFun`. -/
 
 theorem sumUpToOfFun_mul (f g : ℕ → ℕ) :
     ∀n : ℕ, sumUpToOfFun (fun i ↦ f i + g i) n =
-      sumUpToOfFun f n + sumUpToOfFun g n :=
-  sorry
+      sumUpToOfFun f n + sumUpToOfFun g n
+  | 0 => by rfl
+  | n + 1 => by
+      simp +arith [sumUpToOfFun, sumUpToOfFun_mul]
 
 /- 3.3. Prove `sumUpToOfFun_mul` again as a "paper" proof. Follow the
 guidelines given in question 1.4 of the exercise. -/
@@ -146,3 +185,5 @@ guidelines given in question 1.4 of the exercise. -/
 -- enter your paper proof here
 
 end LoVe
+
+

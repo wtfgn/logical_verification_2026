@@ -38,22 +38,22 @@ constructing a term. By hovering over `_`, you will see the current logical
 context. -/
 
 def B : (α → β) → (γ → α) → γ → β :=
-  sorry
+  fun f g c => f $ g c
 
 def S : (α → β → γ) → (α → β) → α → γ :=
-  sorry
+  fun f g a => f a $ g a 
 
 def nonsense1 : (γ → (α → β) → α) → γ → β → α :=
-  sorry
+  fun f c b => f c (fun a => b)
 
 def nonsense2 : (α → α → β) → (β → γ) → α → β → γ :=
-  sorry
+  fun f g a b => g b
 
 def nonsense3 : ((α → β) → γ → δ) → γ → β → δ :=
-  sorry
+  fun f c b => f (fun a => b) c
 
 def nonsense4 : (α → β) → (α → γ) → α → β → γ :=
-  sorry
+  fun f g a b => g a
 
 /- 1.2. Complete the following definition.
 
@@ -63,7 +63,8 @@ follow the procedure described in the Hitchhiker's Guide.
 Note: Peirce is pronounced like the English word "purse". -/
 
 def weakPeirce : ((((α → β) → α) → α) → β) → β :=
-  sorry
+  fun f => f (fun g => g (fun a => f (fun p => a)))
+  -- fun f => f (fun g => g (fun a => _ ))
 
 /- ## Question 2: Typing Derivation
 

@@ -46,7 +46,24 @@ capture the fact that the variable `n` does not change. -/
 
 theorem FACT_correct (n₀ : ℕ) :
     {* fun s ↦ s "n" = n₀ *} (FACT) {* fun s ↦ s "r" = fact n₀ *} :=
-  sorry
+  show 
+    {* fun s ↦ s "n" = n₀ *}
+    ( Stmt.assign "i" (fun s ↦ 0);
+      Stmt.assign "r" (fun s ↦ 1);
+      Stmt.invWhileDo 
+        (fun s ↦ s "r" = fact (s "i") ∧ s "n" = n₀ ∧ s "i" ≤ s "n")
+        (fun s ↦ s "i" ≠ s "n")
+        (Stmt.assign "i" (fun s ↦ s "i" + 1);
+         Stmt.assign "r" (fun s ↦ s "r" * s "i"))
+    )
+    {* fun s ↦ s "r" = fact n₀ *}
+  by
+    vcg
+    . simp
+      grind
+    . aesop
+    . aesop
+
 
 
 /- ## Question 2: Program Verification
@@ -63,8 +80,9 @@ def POWER_OF_TWO (N : ℕ) : Stmt :=
 
 /- 2.1. Define a recursive function that computes 2 to the power of `n`. -/
 
-def twoToTheNth : ℕ → ℕ :=
-  sorry
+def twoToTheNth : ℕ → ℕ 
+  | 0 => 1
+  | n + 1 => twoToTheNth n * 2
 
 /- Remember to test your function. Otherwise, you will have big difficulties
 answering question 2.2 below. -/
@@ -84,9 +102,21 @@ attribute [simp] twoToTheNth
 
 theorem POWER_OF_TWO_correct (N : ℕ) :
     {* fun s ↦ True *}
-    (POWER_OF_TWO N)
+    (Stmt.assign "r" (fun s ↦ 1);
+     Stmt.assign "n" (fun s ↦ 0);
+     Stmt.invWhileDo
+       (fun s ↦ s "r" = twoToTheNth (s "n") ∧ s "n" ≤ N ∧ s "n" ≥ 0)
+       (fun s ↦ s "n" ≠ N)
+       (Stmt.assign "r" (fun s ↦ s "r" * 2);
+        Stmt.assign "n" (fun s ↦ s "n" + 1)))
     {* fun s ↦ s "r" = twoToTheNth N *} :=
-  sorry
+  by
+    vcg
+    . simp
+      aesop
+      . omega
+    . aesop
+    . aesop
 
 
 /- ## Question 3: Hoare Logic for the Guarded Command Language
@@ -113,32 +143,55 @@ namespace PartialHoare
 theorem consequence {P P' Q Q' S} (h : {* P *} (S) {* Q *})
       (hp : ∀s, P' s → P s) (hq : ∀s, Q s → Q' s) :
     {* P' *} (S) {* Q' *} :=
-  sorry
+  fix s t : State
+  assume hs : P' s
+  assume hst : (S, s) ⟹ t
+  show Q' t from
+    hq _ (h s t (hp s hs) hst)
+  
 
 theorem assign_intro {P x a} :
-    {* fun s ↦ P (s[x ↦ a s]) *} (Stmt.assign x a) {* P *} :=
-  sorry
+    {* fun s ↦ P (s[x ↦ a s]) *} (Stmt.assign x a) {* P *} := by
+  intro s t hs hst
+  cases hst with
+  | assign _ _ _ =>
+      exact hs
+  
 
 theorem assert_intro {P Q : State → Prop} :
-    {* fun s ↦ Q s → P s *} (Stmt.assert Q) {* P *} :=
-  sorry
+    {* fun s ↦ Q s → P s *} (Stmt.assert Q) {* P *} := by
+  intro s t hs hst
+  cases hst with
+  | assert _ _ hcond =>
+      exact hs hcond
 
 theorem seq_intro {P Q R S T}
       (hS : {* P *} (S) {* Q *}) (hT : {* Q *} (T) {* R *}) :
-    {* P *} (Stmt.seq S T) {* R *} :=
-  sorry
+    {* P *} (Stmt.seq S T) {* R *} := by
+  intro s t hs hst
+  cases hst with
+  | seq _ _ u _ _ hSsu hTut =>
+      apply hT u
+      apply hS s
+      assumption'
 
 theorem choice_intro {P Q Ss}
       (h : ∀i (hi : i < List.length Ss), {* P *} (Ss[i]'hi) {* Q *}) :
-    {* P *} (Stmt.choice Ss) {* Q *} :=
-  sorry
+    {* P *} (Stmt.choice Ss) {* Q *} := by
+  intro s t hs hst
+  cases hst with
+  | choice _ _ _ i hi hSi =>
+      apply h i hi s t hs hSi
 
 /- 3.2. Prove the Hoare rule for `loop`. Notice the similarity with the rule
 for `while` in the WHILE language. -/
 
 theorem loop_intro {P S} (h : {* P *} (S) {* P *}) :
-    {* P *} (Stmt.loop S) {* P *} :=
-  sorry
+    {* P *} (Stmt.loop S) {* P *} := by
+  intro s t hs hst
+  generalize lst : (Stmt.loop S, s) = Ss
+  rw [lst] at hst
+  induction hst generalizing s <;> aesop
 
 end PartialHoare
 
@@ -202,38 +255,75 @@ namespace PartialHoare
 theorem consequence {P P' Q Q' S} (h : {* P *} (S) {* Q *})
       (hp : ∀s, P' s → P s) (hq : ∀s, Q s → Q' s) :
     {* P' *} (S) {* Q' *} :=
-  sorry
+  fix s t : State
+  assume hs : P' s
+  assume hst : (S, s) ⟹ t
+  show Q' t from
+    hq _ (h s t (hp s hs) hst)
+  
 
 /- 4.2. Prove the Hoare rule for `assign`. -/
 
 theorem assign_intro {P x a} :
-    {* fun s ↦ P (s[x ↦ a s]) *} (Stmt.assign x a) {* P *} :=
-  sorry
+    {* fun s ↦ P (s[x ↦ a s]) *} (Stmt.assign x a) {* P *} := by
+  intro s t P' hst
+  cases hst with
+  | assign => assumption
+
 
 /- 4.3. Prove the Hoare rule for `seq`. -/
 
 theorem seq_intro {P Q R S T} (hS : {* P *} (S) {* Q *})
       (hT : {* Q *} (T) {* R *}) :
-    {* P *} (Stmt.seq S T) {* R *} :=
-  sorry
+    {* P *} (Stmt.seq S T) {* R *} := by
+  intro s t hs hst
+  cases hst with
+  | seq _ _ _ u d hS' hT' =>
+    apply hT
+    · apply hS
+      · exact hs
+      · assumption
+    · assumption
+  
 
 /- 4.4. Prove the Hoare rule for `if`–`then`. -/
 
 theorem if_intro {b P Q S}
       (htrue : {* fun s ↦ P s ∧ b s *} (S) {* Q *})
       (hfalse : ∀s, P s ∧ ¬ b s → Q s) :
-    {* P *} (Stmt.ifThen b S) {* Q *} :=
-  sorry
+    {* P *} (Stmt.ifThen b S) {* Q *} := by
+  intro s t hs hst
+  cases hst with
+  | if_true _ _ _ _ hcond hbody =>
+      apply htrue
+      · exact ⟨hs, hcond⟩
+      · assumption
+  | if_false _ _ _ hcond =>
+      apply hfalse
+      exact ⟨hs, hcond⟩
 
 /- 4.5. Prove the Hoare rule for `loop`. Notice the similarity with the rule for
 `while` in the WHILE language. -/
 
 theorem loop_intro {P S} (h : {* P *} (S) {* P *}) :
-    {* P *} (Stmt.loop S) {* P *} :=
-  sorry
+    {* P *} (Stmt.loop S) {* P *} := by
+  intro s t hs hst
+
+  generalize lst : (Stmt.loop S, s) = Ss
+  rw [lst] at hst
+  induction hst generalizing s with
+  | assign _ _ _ => aesop
+  | seq _ _ _ _ _ hS hT hs_ih ht_ih => aesop
+  | if_true _ _ _ _ hcond hbody ih => aesop
+  | if_false _ _ _ hcond => aesop
+  | loop_exit _ _ => aesop
+  | loop_continue S' s' t' u hbody hrest ih hrest_ih => aesop
+  
+  
 
 end PartialHoare
 
 end LOOP
 
 end LoVe
+

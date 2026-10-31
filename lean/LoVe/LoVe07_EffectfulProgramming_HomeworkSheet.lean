@@ -30,26 +30,34 @@ types. Inventory all the arguments and operations available (e.g., `pure`,
 `>>=`) with their types and see if you can plug them together like Lego
 bricks. -/
 
+#print Pure.pure
+#print Bind.bind
+
+#print comp
 def map {m : Type → Type} [LawfulMonad m] {α β : Type} (f : α → β) (ma : m α) :
     m β :=
-  sorry
+  ma >>= pure ∘ f
 
 /- 1.2. Prove the identity law for `map`.
 
 Hint: You will need `LawfulMonad.bind_pure`. -/
+#print LawfulMonad.bind_pure
 
 theorem map_id {m : Type → Type} [LawfulMonad m] {α : Type} (ma : m α) :
-    map id ma = ma :=
-  sorry
+    map id ma = ma := by
+  simp [map]
+  exact LawfulMonad.bind_pure ma
 
 /- 1.3. Prove the composition law for `map`. -/
 
+#print LawfulMonad.bind_assoc
+#print LawfulMonad.pure_bind
 theorem map_map {m : Type → Type} [LawfulMonad m] {α β γ : Type}
       (f : α → β) (g : β → γ) (ma : m α) :
-    map g (map f ma) = map (fun x ↦ g (f x)) ma :=
-  sorry
-
-
+    map g (map f ma) = map (fun x ↦ g (f x)) ma := by
+  simp [map, LawfulMonad.bind_assoc, LawfulMonad.pure_bind]
+  rfl
+  
 /- ## Question 2: Better Exceptions
 
 The __error monad__ stores either a value of type `α` or an error of type `ε`.
@@ -69,10 +77,11 @@ where `e` is an "exception" of type `ε`.
 monad: -/
 
 def Error.pure {ε α : Type} : α → Error ε α :=
-  sorry
+  Error.good 
 
-def Error.bind {ε α β : Type} : Error ε α → (α → Error ε β) → Error ε β :=
-  sorry
+def Error.bind {ε α β : Type} : Error ε α → (α → Error ε β) → Error ε β
+  | Error.good a, f => f a
+  | Error.bad e, _ => Error.bad e
 
 /- The following type class instance makes it possible to use `pure`, `>>=`,
 and `do` notations in conjunction with error monads: -/
@@ -86,17 +95,17 @@ instance Error.Bind {ε : Type} : Bind (Error ε) :=
 /- 2.2. Prove the three laws for the error monad. -/
 
 theorem Error.pure_bind {ε α β : Type} (a : α) (f : α → Error ε β) :
-    (pure a >>= f) = f a :=
-  sorry
+    (pure a >>= f) = f a := by
+  rfl
 
 theorem Error.bind_pure {ε α : Type} (ma : Error ε α) :
-    (ma >>= pure) = ma :=
-  sorry
+    (ma >>= pure) = ma := by
+  cases ma <;> rfl 
 
 theorem Error.bind_assoc {ε α β γ : Type} (f : α → Error ε β)
       (g : β → Error ε γ) (ma : Error ε α) :
-    ((ma >>= f) >>= g) = (ma >>= (fun a ↦ f a >>= g)) :=
-  sorry
+    ((ma >>= f) >>= g) = (ma >>= (fun a ↦ f a >>= g)) := by
+  cases ma <;> rfl
 
 /- 2.3. Define the following two operations on the error monad.
 
@@ -110,11 +119,11 @@ theorem Error.bind_assoc {ε α β γ : Type} (f : α → Error ε β)
   to a good state, the monad remains in the good state. -/
 
 def Error.throw {ε α : Type} : ε → Error ε α :=
-  sorry
+  Error.bad
 
-def Error.catch {ε α : Type} : Error ε α → (ε → Error ε α) → Error ε α :=
-  sorry
-
+def Error.catch {ε α : Type} : Error ε α → (ε → Error ε α) → Error ε α
+  | Error.good a, _ => Error.good a
+  | Error.bad e, h => h e
 
 /- ## Question 3: Monadic Structure on Lists
 
@@ -134,34 +143,58 @@ def pure {α : Type} (a : α) : List α :=
 /- 3.1. Prove the following property of `bind` under the append operation. -/
 
 theorem bind_append {α β : Type} (f : α → List β) :
-    ∀as as' : List α, bind (as ++ as') f = bind as f ++ bind as' f :=
-  sorry
+    ∀as as' : List α, bind (as ++ as') f = bind as f ++ bind as' f := by
+  intro as as'
+  induction as with
+  | nil => rfl
+  | cons a as ih =>
+      simp [bind, ih]
+
 
 /- 3.2. Prove the three laws for `List`. -/
 
 theorem pure_bind {α β : Type} (a : α) (f : α → List β) :
-    bind (pure a) f = f a :=
-  sorry
+    bind (pure a) f = f a := by
+  simp [pure, bind]
 
 theorem bind_pure {α : Type} :
-    ∀as : List α, bind as pure = as :=
-  sorry
+    ∀as : List α, bind as pure = as := by
+  intro as
+  induction as with
+  | nil =>
+      rfl
+  | cons a as ih =>
+      simp [bind, pure, ih]
 
 theorem bind_assoc {α β γ : Type} (f : α → List β) (g : β → List γ) :
-    ∀as : List α, bind (bind as f) g = bind as (fun a ↦ bind (f a) g) :=
-  sorry
+    ∀as : List α, bind (bind as f) g = bind as (fun a ↦ bind (f a) g) := by
+  intro as
+  induction as with
+  | nil =>
+      rfl
+  | cons a as ih =>
+      simp [bind, bind_append, ih]
 
 /- 3.3. Prove the following list-specific law. -/
 
 theorem bind_pure_comp_eq_map {α β : Type} {f : α → β} :
-    ∀as : List α, bind as (fun a ↦ pure (f a)) = List.map f as :=
-  sorry
+    ∀as : List α, bind as (fun a ↦ pure (f a)) = List.map f as := by
+  intro as
+  induction as with
+  | nil =>
+      rfl
+  | cons a as ih =>
+      simp [bind, ih]
+      rfl
 
 /- 3.4. Register `List` as a lawful monad: -/
 
 instance LawfulMonad : LawfulMonad List :=
-  sorry
-
+  { pure := List.pure
+    bind := List.bind
+    pure_bind := List.pure_bind
+    bind_pure := List.bind_pure
+    bind_assoc := List.bind_assoc }
 end List
 
 
@@ -178,8 +211,12 @@ monad `m`.
 Hint: You will need the theorem `LawfulMonad.pure_bind` in the induction step. -/
 
 theorem mmap_pure {m : Type → Type} [LawfulMonad m] {α : Type} (as : List α) :
-    mmap (pure : α → m α) as = pure as :=
-  sorry
+    mmap (pure : α → m α) as = pure as := by
+  induction as with
+  | nil =>
+      rfl
+  | cons a as ih =>
+      simp [mmap, ih, LawfulMonad.pure_bind]
 
 /- Commutative monads are monads for which we can reorder actions that do not
 depend on each other. Formally: -/
@@ -199,7 +236,11 @@ theorem Option.bind_comm {α β γ δ : Type} (ma : Option α) (f : α → Optio
     (ma >>= (fun a ↦ g a >>= (fun c ↦ f a >>= (fun b ↦ h a b c)))) :=
   by
     simp [Bind.bind, Option.bind]
-    sorry
+    induction ma with
+    | none =>
+        rfl
+    | some a =>
+        aesop
 
 /- 4.3. Explain why `Error` is not a commutative monad. -/
 
@@ -209,8 +250,33 @@ theorem Option.bind_comm {α β γ δ : Type} (ma : Option α) (f : α → Optio
 commutative monads. -/
 
 theorem mmap_mmap {m : Type → Type} [CommLawfulMonad m]
-      {α β γ : Type} (f : α → m β) (g : β → m γ) (as : List α) :
-    (mmap f as >>= mmap g) = mmap (fun a ↦ f a >>= g) as :=
-  sorry
+    {α β γ : Type} (f : α → m β) (g : β → m γ) (as : List α) :
+    (mmap f as >>= mmap g) = mmap (fun a ↦ f a >>= g) as := by
+  induction as with
+  | nil =>
+      simp [mmap, LawfulMonad.pure_bind]
+  | cons a as ih =>
+      simp [ mmap
+           , LawfulMonad.bind_assoc
+           , LawfulMonad.pure_bind
+           ]
+      -- after unfolding we have
+      --   do b ← f a
+      --      bs ← mmap f as
+      --      c ← g b
+      --      cs ← mmap g bs
+      --      pure (c :: cs)
+      -- commute the independent actions `mmap f as` and `g b`
+      rw [CommLawfulMonad.bind_comm
+            (ma := f a)
+            (f := fun _ => mmap f as)
+            (g := fun b => g b)
+            (h := fun _ bs c => do
+                    let cs ← mmap g bs
+                    pure (c :: cs)
+            )
+         ]
+      simp [←ih, LawfulMonad.bind_assoc]
+
 
 end LoVe
